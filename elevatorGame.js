@@ -8,27 +8,30 @@
                 this.checkDestinationQueue();
             }
 
+            elevator.updateDirection = function(floorNum){
+                if(floorNum === this.currentFloor())
+                    return;
+
+                if(floorNum > this.currentFloor()){
+                    elevator.goingDownIndicator(false);
+                    elevator.goingUpIndicator(true);
+                }else{
+                    elevator.goingDownIndicator(true);
+                    elevator.goingUpIndicator(false);
+                }
+            }
+
             elevator.index = index;
             elevator.on("floor_button_pressed", function(floorNum) {
-                if(floorNum < elevator.currentFloor()){
-                //    elevator.goingDownIndicator(true);
-                //    elevator.goingUpIndicator(false);
-                }else if (floorNum > elevator.currentFloor()){
-                //    elevator.goingDownIndicator(false);
-                //    elevator.goingUpIndicator(true);
-                }
                 console.log('----------------------')
                 logElevator(elevator);
-                console.log(`Someone just pressed the ${floorNum} button. Stopping here.` );
+                console.log(`Someone just pressed the ${floorNum} button. Going there.` );
                 console.log('----------------------')
                 elevator.removeFloorFromQueue(floorNum);
                 elevator.goToFloor(floorNum);
             });
 
             elevator.on("passing_floor", function(floorNum, direction) {
-                if(elevator.loadFactor() === 1)
-                    return;
-
                 if(elevator.getPressedFloors().indexOf(floorNum) !== -1){
                     console.log('----------------------')
                     logElevator(elevator);
@@ -39,10 +42,13 @@
                     return;
                 }
 
+                if(elevator.loadFactor() === 1)
+                    return;
+
                 if(direction === "up" && upIndicatorFloors.indexOf(floorNum) !== -1) {
                     console.log('----------------------')
                     logElevator(elevator);
-                    console.log(`Passing floor ${floorNum} and wants to go up. Stopping here. ${elevator}`);
+                    console.log(`Passing floor ${floorNum} and wants to go up. Stopping here.`);
                     console.log('----------------------')
                     elevator.removeFloorFromQueue(floorNum);
                     elevator.goToFloor(floorNum, true);
@@ -52,7 +58,7 @@
                 if(direction === "down" && dowmIndicatorFloors.indexOf(floorNum) !== -1) {
                     console.log('----------------------')
                     logElevator(elevator);
-                    console.log(`Passing floor ${floorNum} and wants to go down. Stopping here. ${elevator}`);
+                    console.log(`Passing floor ${floorNum} and wants to go down. Stopping here.`);
                     console.log('----------------------')
                     elevator.removeFloorFromQueue(floorNum);
                     elevator.goToFloor(floorNum, true);
@@ -71,12 +77,15 @@
                                     .sort((a,b) => a.diff - b.diff)[0];
 
                 if(!closestActiveFloor){
+                  //  elevator.goingDownIndicator(true);
+                  //  elevator.goingUpIndicator(true);
                     return;
                 }
 
                 upIndicatorFloors = removeFloor(closestActiveFloor.floor, upIndicatorFloors);
                 dowmIndicatorFloors = removeFloor(closestActiveFloor.floor, dowmIndicatorFloors);
                 elevator.goToFloor(closestActiveFloor.floor);
+              //  elevator.updateDirection(closestActiveFloor.floor)
             });    
         });  
 
