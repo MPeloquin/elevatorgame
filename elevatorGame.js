@@ -1,11 +1,15 @@
 {
-    init: function(elevators, floors) {
-        var elevator = elevators[0]; // Let's use the first elevator
-
-        elevators.forEach(function(elevator, index){
+    init: function (elevators, floors) {
+        elevators.forEach(function(elevator, index) {
             elevator.removeFloorFromQueue = function(floorNum){
                 this.destinationQueue = this.destinationQueue.filter((floor) => floor !== floorNum);
                 this.checkDestinationQueue();
+            }
+
+            elevator.goToFloorWithUpdate = function(floorNum, force){
+                elevator.removeFloorFromQueue(floorNum);
+                elevator.goToFloor(floorNum, force);
+                elevator.updateDirection(floorNum);
             }
 
             elevator.updateDirection = function(floorNum){
@@ -13,11 +17,11 @@
                     return;
 
                 if(floorNum > this.currentFloor()){
-                    elevator.goingDownIndicator(false);
-                    elevator.goingUpIndicator(true);
+                    this.goingDownIndicator(false);
+                    this.goingUpIndicator(true);
                 }else{
-                    elevator.goingDownIndicator(true);
-                    elevator.goingUpIndicator(false);
+                    this.goingDownIndicator(true);
+                    this.goingUpIndicator(false);
                 }
             }
 
@@ -27,8 +31,7 @@
                 logElevator(elevator);
                 console.log(`Someone just pressed the ${floorNum} button. Going there.` );
                 console.log('----------------------')
-                elevator.removeFloorFromQueue(floorNum);
-                elevator.goToFloor(floorNum);
+                elevator.goToFloorWithUpdate(floorNum);
             });
 
             elevator.on("passing_floor", function(floorNum, direction) {
@@ -37,8 +40,7 @@
                     logElevator(elevator);
                     console.log(`Passing floor ${floorNum} and someone selected the floor. Stopping here.` );
                     console.log('----------------------')
-                    elevator.removeFloorFromQueue(floorNum);
-                    elevator.goToFloor(floorNum, true);
+                    elevator.goToFloorWithUpdate(floorNum, true);
                     return;
                 }
 
@@ -50,8 +52,7 @@
                     logElevator(elevator);
                     console.log(`Passing floor ${floorNum} and wants to go up. Stopping here.`);
                     console.log('----------------------')
-                    elevator.removeFloorFromQueue(floorNum);
-                    elevator.goToFloor(floorNum, true);
+                    elevator.goToFloorWithUpdate(floorNum, true);
                     upIndicatorFloors = removeFloor(floorNum, upIndicatorFloors);
                 }
 
@@ -60,45 +61,72 @@
                     logElevator(elevator);
                     console.log(`Passing floor ${floorNum} and wants to go down. Stopping here.`);
                     console.log('----------------------')
-                    elevator.removeFloorFromQueue(floorNum);
-                    elevator.goToFloor(floorNum, true);
+                    elevator.goToFloorWithUpdate(floorNum, true);
                     dowmIndicatorFloors = removeFloor(floorNum, dowmIndicatorFloors);
                 }
             });
 
             elevator.on("stopped_at_floor", function(floorNum) {
                 elevator.removeFloorFromQueue(floorNum);
+
+                if (floorNum == floors.length - 1){
+                    this.goingDownIndicator(true);
+                    this.goingUpIndicator(false);
+                }
+
+                if (floorNum == 0){
+                    this.goingDownIndicator(false);
+                    this.goingUpIndicator(true);
+                }
+
+                if(elevator.getPressedFloors().length == 0){
+                    this.goingDownIndicator(true);
+                    this.goingUpIndicator(true);
+                }
             });
 
             // Whenever the elevator is idle (has no more queued destinations) ...
             elevator.on("idle", function() {
-                var closestActiveFloor = upIndicatorFloors.concat(dowmIndicatorFloors)
-                                    .map((x) => ({floor: x, diff:Math.abs(7 - x)}))
-                                    .sort((a,b) => a.diff - b.diff)[0];
-
-                if(!closestActiveFloor){
-                  //  elevator.goingDownIndicator(true);
-                  //  elevator.goingUpIndicator(true);
-                    return;
-                }
-
-                upIndicatorFloors = removeFloor(closestActiveFloor.floor, upIndicatorFloors);
-                dowmIndicatorFloors = removeFloor(closestActiveFloor.floor, dowmIndicatorFloors);
-                elevator.goToFloor(closestActiveFloor.floor);
-              //  elevator.updateDirection(closestActiveFloor.floor)
+                sendIdleElevator(elevator);
             });    
         });  
 
+        var sendIdleElevator = function(elevator){
+            if(elevator == null)
+                return;
+
+            var closestActiveFloor = upIndicatorFloors.concat(dowmIndicatorFloors)
+                .map((x) => ({floor: x, diff:Math.abs(floors.length - x)}))
+                .sort((a,b) => a.diff - b.diff)[0];
+
+            console.log("elevator is idle with active floors " + closestActiveFloor);
+            console.log(logElevator(elevator))
+
+            if(!closestActiveFloor){
+                elevator.goingDownIndicator(true);
+                elevator.goingUpIndicator(true);
+                idleElevators.push(elevator);
+                return;
+            }
+
+            upIndicatorFloors = removeFloor(closestActiveFloor.floor, upIndicatorFloors);
+            dowmIndicatorFloors = removeFloor(closestActiveFloor.floor, dowmIndicatorFloors);
+            elevator.goToFloorWithUpdate(closestActiveFloor.floor);
+        }
+
         var upIndicatorFloors = [];
         var dowmIndicatorFloors = [];
+        var idleElevators = [];
 
         floors.forEach(function(floor){
             floor.on("up_button_pressed", function() {
                 upIndicatorFloors.push(floor.floorNum());
+                sendIdleElevator(idleElevators.pop());
             });
 
             floor.on("down_button_pressed", function() {
                 dowmIndicatorFloors.push(floor.floorNum());
+                sendIdleElevator(idleElevators.pop());
             });
         });
 
@@ -122,7 +150,7 @@
             })));
         }
     },
-    update: function(dt, elevators, floors) {
+    update: function (dt, elevators, floors) {
         // We normally don't need to do anything here
     }
 }
